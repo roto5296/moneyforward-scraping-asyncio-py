@@ -151,7 +151,7 @@ class MFScraper:
         return ret
 
     async def get_account(self):
-        if not self._account:
+        async def inner_get_account(self):
             try:
                 async with self._session.get("https://moneyforward.com/groups") as result:
                     result.raise_for_status()
@@ -195,11 +195,14 @@ class MFScraper:
                                 }
                             }
                         )
-                self._account = accounts
-        return self._account
+            return accounts
+
+        if not self._account:
+            self._account = asyncio.create_task(inner_get_account(self))
+        return await self._account
 
     async def get_category(self):
-        if not self._category:
+        async def inner_get_category(self):
             try:
                 async with self._session.get("https://moneyforward.com/cf") as result:
                     result.raise_for_status()
@@ -219,8 +222,11 @@ class MFScraper:
                     d.update({"id": int(tmp["id"])})
                     d_pm.update({tmp.text: d})
                 categories.update({key: d_pm})
-            self._category = categories
-        return self._category
+            return categories
+
+        if not self._category:
+            self._category = asyncio.create_task(inner_get_category(self))
+        return await self._category
 
     async def save(
         self,
