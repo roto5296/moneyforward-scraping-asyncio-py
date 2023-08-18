@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "mfscraping-asyncio"
-version = "0.1.0"
+version = "1.0.0"
 description = ""
 authors = ["roto5296 <hikun5296@gmail.com>"]
 
