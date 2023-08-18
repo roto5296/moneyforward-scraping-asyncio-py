@@ -296,12 +296,14 @@ class MFScraper:
             for a in soup.select(".js-sub-account-group-parent"):
                 account_id = str(a["id"]).replace("js-sub_account_split_", "")
                 aname = str(a.next_sibling).replace("\n", "")
-                sub_accounts = soup.select("." + re.sub("^([1-9])", "\\\\3\\1", account_id))
+                sub_accounts = soup.select("." + re.sub("^([1-9])", "\\\\3\\1 ", account_id))
                 if sub_accounts:
                     for sa in sub_accounts:
                         if sa.has_attr("checked"):
-                            saname = re.sub(
-                                "^\\s|\\s$", "", str(sa.next_sibling).replace("\n", "")
+                            saname = " ".join(
+                                re.sub(
+                                    "^\\s|\\s$", "", str(sa.next_sibling).replace("\n", "")
+                                ).split()
                             )
                             tmp = {
                                 "account_id": account_id,
