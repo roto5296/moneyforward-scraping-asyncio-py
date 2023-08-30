@@ -460,3 +460,31 @@ class MFScraper:
 
     async def delete(self, data: MFTransaction) -> None:
         await self._delete("https://moneyforward.com/cf/" + str(data.transaction_id))
+
+    async def get_withdrawal(self) -> dict[Account, dict[str, int | datetime.date]]:
+        accounts = await self.get_account()
+        ids = set(x["account_id"] for x in accounts.values())
+        ret = {}
+        for text in await asyncio.gather(
+            *[self._get("https://moneyforward.com/accounts/show/" + id) for id in ids]
+        ):
+            soup = BS(text, "html.parser")
+            table = soup.select_one(".table-bordered")
+            title = soup.select_one(".show-title")
+            if table and title:
+                if table.select("thead tr th")[3].text == "引き落とし予定額":
+                    for tr in table.select("tbody tr"):
+                        if len(tr.attrs["class"]) == 0:
+                            tds = tr.select("td")
+                            subac = (
+                                tds[1].text.replace("\n", "") + " " + tds[2].text.replace("\n", "")
+                            ).strip()
+                            if (amount_date := tds[3].text.replace("\n", "")) != "-":
+                                amount_date = amount_date.split("(")
+                                amount = int(amount_date[0].replace(",", "").replace("円", ""))
+                                date_str = amount_date[1].replace(")", "").split("/")
+                                date = datetime.date(
+                                    int(date_str[0]), int(date_str[1]), int(date_str[2])
+                                )
+                                ret.update({(title.text, subac): {"amount": amount, "date": date}})
+        return ret
