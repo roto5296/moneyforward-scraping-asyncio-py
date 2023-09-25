@@ -37,7 +37,7 @@ def is_Account(x: Any) -> TypeGuard[Account]:
 
 def str2Account(x: str) -> Account:
     x_ = x.split(":")
-    return tuple(x_) if len(x_) == 2 else (x_[0],)
+    return (x_[0], x_[1]) if len(x_) == 2 else (x_[0],)
 
 
 def Account2str(x: Account) -> str:
@@ -253,8 +253,9 @@ class MFScraper:
                 subacs = str(td_calc["title"]).split("から")
                 subacs[0] = subacs[0].replace(acs[0], "", 1).strip()
                 subacs[1] = subacs[1].replace(acs[1], "", 1).replace("への振替", "").strip()
-                account = tuple(
-                    (ac, subac) if subac != "" else (ac,) for ac, subac in zip(acs, subacs)
+                account = (
+                    (acs[0], subacs[0]) if subacs[0] != "" else (acs[0],),
+                    (acs[1], subacs[1]) if subacs[1] != "" else (acs[1],),
                 )
             else:
                 ac = td_calc.text.replace("\n", "")
@@ -474,17 +475,16 @@ class MFScraper:
             if table and title:
                 if table.select("thead tr th")[3].text == "引き落とし予定額":
                     for tr in table.select("tbody tr"):
-                        if len(tr.attrs["class"]) == 0:
-                            tds = tr.select("td")
-                            subac = (
-                                tds[1].text.replace("\n", "") + " " + tds[2].text.replace("\n", "")
-                            ).strip()
-                            if (amount_date := tds[3].text.replace("\n", "")) != "-":
-                                amount_date = amount_date.split("(")
-                                amount = int(amount_date[0].replace(",", "").replace("円", ""))
-                                date_str = amount_date[1].replace(")", "").split("/")
-                                date = datetime.date(
-                                    int(date_str[0]), int(date_str[1]), int(date_str[2])
-                                )
-                                ret.update({(title.text, subac): {"amount": amount, "date": date}})
+                        tds = tr.select("td")
+                        subac = (
+                            tds[1].text.replace("\n", "") + " " + tds[2].text.replace("\n", "")
+                        ).strip()
+                        if (amount_date := tds[3].text.replace("\n", "")) != "-":
+                            amount_date = amount_date.split("(")
+                            amount = int(amount_date[0].replace(",", "").replace("円", ""))
+                            date_str = amount_date[1].replace(")", "").split("/")
+                            date = datetime.date(
+                                int(date_str[0]), int(date_str[1]), int(date_str[2])
+                            )
+                            ret.update({(title.text, subac): {"amount": amount, "date": date}})
         return ret
