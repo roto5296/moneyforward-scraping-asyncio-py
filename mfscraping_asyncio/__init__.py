@@ -488,3 +488,26 @@ class MFScraper:
                             )
                             ret.update({(title.text, subac): {"amount": amount, "date": date}})
         return ret
+
+    async def get_balance(self) -> dict[Account, dict[str, int | datetime.date]]:
+        accounts = await self.get_account()
+        ids = set(x["account_id"] for x in accounts.values())
+        ret = {}
+        for text in await asyncio.gather(
+            *[self._get("https://moneyforward.com/accounts/show/" + id) for id in ids]
+        ):
+            soup = BS(text, "html.parser")
+            table = soup.select_one(".table-bordered")
+            title = soup.select_one(".show-title")
+            if table and title:
+                if table.select("thead tr th")[3].text == "残高":
+                    title_text = re.sub(r"\([^()]*\)", "", title.text.replace("\n", ""))
+                    amount = 0
+                    for tr in table.select("tbody tr"):
+                        if isinstance(li := tr.get("class"), list) and "outside-group" in li:
+                            continue
+                        tds = tr.select("td")
+                        if (tmp := tds[3].text.replace("\n", "")) != "-":
+                            amount += int(tmp.replace(",", "").replace("円", ""))
+                    ret.update({(title_text,): amount})
+        return ret
