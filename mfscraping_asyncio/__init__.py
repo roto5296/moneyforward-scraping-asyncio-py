@@ -195,14 +195,41 @@ class MFScraper:
         except (aiohttp.ServerTimeoutError, aiohttp.ClientResponseError) as e:
             raise MFConnectionError(e)
 
-    async def fetch(self, delay: int = 2, maxwaiting: int = 300) -> None:
+    async def fetch(self, delay: int = 2, maxwaiting: int = 300, delta=60) -> None:
         ret = await self._get("https://moneyforward.com")
         soup = BS(ret, "html.parser")
         urls = soup.select("a[data-remote=true]")
-        urls = [str(url["href"]) for url in urls]
-        self._results = []
         for url in urls:
-            await self._post("https://moneyforward.com" + url, None, False)
+            tmp = url
+            skip = False
+            for _ in range(3):
+                if tmp is None:
+                    skip = True
+                    break
+                tmp = tmp.parent
+            if skip or tmp is None:
+                continue
+            tmp = tmp.select_one(".date")
+            if tmp is None:
+                continue
+            m = re.search(r"\((.*)\)", tmp.text)
+            if m is None:
+                continue
+            date_str = m.group(1)
+            now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=9)))
+            tmp = date_str.split(" ")
+            tmp1 = tmp[0].split("/")
+            tmp2 = tmp[1].split(":")
+            update_date = datetime.datetime(
+                now.year,
+                int(tmp1[0]),
+                int(tmp1[1]),
+                int(tmp2[0]),
+                int(tmp2[1]),
+                tzinfo=datetime.timezone(datetime.timedelta(hours=9)),
+            )
+            if now < update_date or now >= update_date + datetime.timedelta(minutes=delta):
+                await self._post("https://moneyforward.com" + str(url["href"]), None, False)
         counter = 0
         while counter < maxwaiting:
             await asyncio.sleep(delay)
