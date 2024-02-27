@@ -492,15 +492,32 @@ class MFScraper:
     async def get_withdrawal(self) -> dict[Account, dict[str, int | datetime.date]]:
         accounts = await self.get_account()
         ids = set(x["account_id"] for x in accounts.values())
+        ret_ = await self._get("https://moneyforward.com")
+        soup_ = BS(ret_, "html.parser")
         ret = {}
-        for text in await asyncio.gather(
-            *[self._get("https://moneyforward.com/accounts/show/" + id) for id in ids]
+        dt_now_jst = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=9)))
+        for text, id in zip(
+            await asyncio.gather(
+                *[self._get("https://moneyforward.com/accounts/show/" + id) for id in ids]
+            ),
+            ids,
         ):
             soup = BS(text, "html.parser")
             table = soup.select_one(".table-bordered")
             title = soup.select_one(".show-title")
-            if table and title:
+            update_date_str = soup_.select_one("div.date." + re.sub("^([1-9])", "\\\\3\\1 ", id))
+            if table and title and update_date_str:
                 if table.select("thead tr th")[3].text == "引き落とし予定額":
+                    update_date_md = (
+                        update_date_str.text.replace("取得日時(", "").split(" ")[0].split("/")
+                    )
+                    update_date = datetime.date(
+                        dt_now_jst.year, int(update_date_md[0]), int(update_date_md[1])
+                    )
+                    if update_date > dt_now_jst.date():
+                        update_date = datetime.date(
+                            dt_now_jst.year - 1, int(update_date_md[0]), int(update_date_md[1])
+                        )
                     for tr in table.select("tbody tr"):
                         tds = tr.select("td")
                         subac = (
@@ -513,22 +530,47 @@ class MFScraper:
                             date = datetime.date(
                                 int(date_str[0]), int(date_str[1]), int(date_str[2])
                             )
-                            ret.update({(title.text, subac): {"amount": amount, "date": date}})
+                            ret.update(
+                                {
+                                    (title.text, subac): {
+                                        "amount": amount,
+                                        "date": date,
+                                        "update_date": update_date,
+                                    }
+                                }
+                            )
         return ret
 
     async def get_balance(self) -> dict[Account, dict[str, int | datetime.date]]:
         accounts = await self.get_account()
         ids = set(x["account_id"] for x in accounts.values())
+        ret_ = await self._get("https://moneyforward.com")
+        soup_ = BS(ret_, "html.parser")
         ret = {}
-        for text in await asyncio.gather(
-            *[self._get("https://moneyforward.com/accounts/show/" + id) for id in ids]
+        dt_now_jst = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=9)))
+        for text, id in zip(
+            await asyncio.gather(
+                *[self._get("https://moneyforward.com/accounts/show/" + id) for id in ids]
+            ),
+            ids,
         ):
             soup = BS(text, "html.parser")
             table = soup.select_one(".table-bordered")
             title = soup.select_one(".show-title")
-            if table and title:
+            update_date_str = soup_.select_one("div.date." + re.sub("^([1-9])", "\\\\3\\1 ", id))
+            if table and title and update_date_str:
                 if table.select("thead tr th")[3].text == "残高":
                     title_text = re.sub(r"\([^()]*\)", "", title.text.replace("\n", ""))
+                    update_date_md = (
+                        update_date_str.text.replace("取得日時(", "").split(" ")[0].split("/")
+                    )
+                    update_date = datetime.date(
+                        dt_now_jst.year, int(update_date_md[0]), int(update_date_md[1])
+                    )
+                    if update_date > dt_now_jst.date():
+                        update_date = datetime.date(
+                            dt_now_jst.year - 1, int(update_date_md[0]), int(update_date_md[1])
+                        )
                     amount = 0
                     for tr in table.select("tbody tr"):
                         if isinstance(li := tr.get("class"), list) and "outside-group" in li:
@@ -536,5 +578,5 @@ class MFScraper:
                         tds = tr.select("td")
                         if (tmp := tds[3].text.replace("\n", "")) != "-":
                             amount += int(tmp.replace(",", "").replace("円", ""))
-                    ret.update({(title_text,): amount})
+                    ret.update({(title_text,): {"amount": amount, "update_date": update_date}})
         return ret
