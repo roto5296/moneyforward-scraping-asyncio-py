@@ -505,7 +505,13 @@ class MFScraper:
             soup = BS(text, "html.parser")
             table = soup.select_one(".table-bordered")
             title = soup.select_one(".show-title")
-            update_date_str = soup_.select_one("div.date." + re.sub("^([1-9])", "\\\\3\\1 ", id))
+            update_date_str1 = soup_.select_one("div.date." + re.sub("^([1-9])", "\\\\3\\1 ", id))
+            update_date_str2 = soup_.select_one(
+                "div.date-not-display-none." + re.sub("^([1-9])", "\\\\3\\1 ", id)
+            )
+            update_date_str = (
+                update_date_str1 if update_date_str1 is not None else update_date_str2
+            )
             if table and title and update_date_str:
                 if table.select("thead tr th")[3].text == "引き落とし予定額":
                     update_date_md = (
@@ -530,15 +536,18 @@ class MFScraper:
                             date = datetime.date(
                                 int(date_str[0]), int(date_str[1]), int(date_str[2])
                             )
-                            ret.update(
-                                {
-                                    (title.text, subac): {
-                                        "amount": amount,
-                                        "date": date,
-                                        "update_date": update_date,
-                                    }
+                        else:
+                            amount = None
+                            date = None
+                        ret.update(
+                            {
+                                (title.text, subac): {
+                                    "amount": amount,
+                                    "date": date,
+                                    "update_date": update_date,
                                 }
-                            )
+                            }
+                        )
         return ret
 
     async def get_balance(self) -> dict[Account, dict[str, int | datetime.date]]:
