@@ -17,6 +17,7 @@ from .exceptions import (
     MFConnectionError,
     MFInitializeError,
     MFScraptingError,
+    NeedOTP,
 )
 
 Account: TypeAlias = tuple[str] | tuple[str, str]
@@ -102,6 +103,8 @@ class MFScraper:
         self._account = None
         self._category = None
         self._headers = {}
+        self._otp_post_data = None
+        self._is_logined = False
 
     async def __aenter__(self):
         self._session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(self._timeout))
@@ -190,6 +193,50 @@ class MFScraper:
                         }
                     else:
                         raise MFScraptingError()
+                    self._is_logined = True
+                elif "email_otp" in tmp:
+                    tmp = re.search(r"gon\.authorizationParams={.*?}", await result.text())
+                    if tmp:
+                        tmp = tmp.group().replace("gon.authorizationParams=", "")
+                        post_data = json.loads(tmp)
+                    soup = BS(ret, "html.parser")
+                    tmp = soup.select_one("meta[name=csrf-token]")
+                    if isinstance(tmp, Tag):
+                        token = tmp.get("content")
+                    post_data["authenticity_token"] = token
+                    post_data["method"] = "post"
+                    self._otp_post_data = post_data
+                    raise NeedOTP
+                else:
+                    raise LoginFailed
+        except (aiohttp.ServerTimeoutError, aiohttp.ClientResponseError) as e:
+            raise MFConnectionError(e)
+
+    async def login_otp(self, otp) -> None:
+        if not self._session:
+            raise MFInitializeError()
+        try:
+            if self._is_logined:
+                return
+            if not self._otp_post_data:
+                raise LoginFailed
+            self._otp_post_data["email_otp"] = otp
+            async with self._session.post(
+                "https://id.moneyforward.com/email_otp", data=self._otp_post_data
+            ) as result:
+                result.raise_for_status()
+                tmp = str(result.url)
+                if tmp == "https://moneyforward.com/":
+                    soup = BS(await result.text(), "html.parser")
+                    tmp = soup.select_one("meta[name=csrf-token]")
+                    if isinstance(tmp, Tag):
+                        self._headers = {
+                            "X-CSRF-Token": tmp.get("content"),
+                            "X-Requested-With": "XMLHttpRequest",
+                        }
+                    else:
+                        raise MFScraptingError()
+                    self._is_logined = True
                 else:
                     raise LoginFailed
         except (aiohttp.ServerTimeoutError, aiohttp.ClientResponseError) as e:

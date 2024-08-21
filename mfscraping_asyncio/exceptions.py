@@ -6,6 +6,10 @@ class LoginFailed(Exception):
     pass
 
 
+class NeedOTP(Exception):
+    pass
+
+
 class MFConnectionError(Exception):
     pass
 
