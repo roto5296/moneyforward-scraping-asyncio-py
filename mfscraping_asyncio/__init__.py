@@ -194,6 +194,26 @@ class MFScraper:
                     else:
                         raise MFScraptingError()
                     self._is_logined = True
+                elif "loading_screen" in tmp:
+                    await asyncio.sleep(5)
+                    async with self._session.get(
+                        tmp.replace("loading_screen", "loading_screen/finalize")
+                    ) as result2:
+                        result2.raise_for_status()
+                        tmp = str(result2.url)
+                        if tmp == "https://moneyforward.com/":
+                            soup = BS(await result2.text(), "html.parser")
+                            tmp = soup.select_one("meta[name=csrf-token]")
+                            if isinstance(tmp, Tag):
+                                self._headers = {
+                                    "X-CSRF-Token": tmp.get("content"),
+                                    "X-Requested-With": "XMLHttpRequest",
+                                }
+                            else:
+                                raise MFScraptingError()
+                            self._is_logined = True
+                        else:
+                            raise LoginFailed
                 elif "email_otp" in tmp:
                     tmp = re.search(r"gon\.authorizationParams={.*?}", await result.text())
                     if tmp:
@@ -572,29 +592,30 @@ class MFScraper:
                             dt_now_jst.year - 1, int(update_date_md[0]), int(update_date_md[1])
                         )
                     for tr in table.select("tbody tr"):
-                        tds = tr.select("td")
-                        subac = (
-                            tds[1].text.replace("\n", "") + " " + tds[2].text.replace("\n", "")
-                        ).strip()
-                        if (amount_date := tds[3].text.replace("\n", "")) != "-":
-                            amount_date = amount_date.split("(")
-                            amount = int(amount_date[0].replace(",", "").replace("円", ""))
-                            date_str = amount_date[1].replace(")", "").split("/")
-                            date = datetime.date(
-                                int(date_str[0]), int(date_str[1]), int(date_str[2])
-                            )
-                        else:
-                            amount = None
-                            date = None
-                        ret.update(
-                            {
-                                (title.text, subac): {
-                                    "amount": amount,
-                                    "date": date,
-                                    "update_date": update_date,
+                        if len(tr.attrs["class"]) == 0:
+                            tds = tr.select("td")
+                            subac = (
+                                tds[1].text.replace("\n", "") + " " + tds[2].text.replace("\n", "")
+                            ).strip()
+                            if (amount_date := tds[3].text.replace("\n", "")) != "-":
+                                amount_date = amount_date.split("(")
+                                amount = int(amount_date[0].replace(",", "").replace("円", ""))
+                                date_str = amount_date[1].replace(")", "").split("/")
+                                date = datetime.date(
+                                    int(date_str[0]), int(date_str[1]), int(date_str[2])
+                                )
+                            else:
+                                amount = None
+                                date = None
+                            ret.update(
+                                {
+                                    (title.text, subac): {
+                                        "amount": amount,
+                                        "date": date,
+                                        "update_date": update_date,
+                                    }
                                 }
-                            }
-                        )
+                            )
         return ret
 
     async def get_balance(self) -> dict[Account, dict[str, int | datetime.date]]:
