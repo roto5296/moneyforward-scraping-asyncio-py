@@ -194,10 +194,10 @@ class MFScraper:
                     else:
                         raise MFScraptingError()
                     self._is_logined = True
-                elif "loading_screen" in tmp:
+                elif "auto_upgrade" in tmp:
                     await asyncio.sleep(5)
                     async with self._session.get(
-                        tmp.replace("loading_screen", "loading_screen/finalize")
+                        tmp.replace("auto_upgrade", "auto_upgrade/finalize")
                     ) as result2:
                         result2.raise_for_status()
                         tmp = str(result2.url)
