@@ -607,15 +607,16 @@ class MFScraper:
                             else:
                                 amount = None
                                 date = None
-                            ret.update(
-                                {
-                                    (title.text, subac): {
-                                        "amount": amount,
-                                        "date": date,
-                                        "update_date": update_date,
+                            if not ((title.text, subac) in ret and date is None):
+                                ret.update(
+                                    {
+                                        (title.text, subac): {
+                                            "amount": amount,
+                                            "date": date,
+                                            "update_date": update_date,
+                                        }
                                     }
-                                }
-                            )
+                                )
         return ret
 
     async def get_balance(self) -> dict[Account, dict[str, int | datetime.date]]:
