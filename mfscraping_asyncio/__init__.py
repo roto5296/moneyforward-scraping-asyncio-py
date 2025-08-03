@@ -10,15 +10,9 @@ import aiohttp
 from bs4 import BeautifulSoup as BS
 from bs4 import Tag
 
-from .exceptions import (
-    DataDoesNotExist,
-    FetchTimeout,
-    LoginFailed,
-    MFConnectionError,
-    MFInitializeError,
-    MFScraptingError,
-    NeedOTP,
-)
+from .exceptions import (DataDoesNotExist, FetchTimeout, LoginFailed,
+                         MFConnectionError, MFInitializeError,
+                         MFScraptingError, NeedOTP)
 
 Account: TypeAlias = tuple[str] | tuple[str, str]
 
@@ -95,7 +89,7 @@ class MFTransaction:
 
 
 class MFScraper:
-    def __init__(self, id: int, passwd: str, timeout: int = 10) -> None:
+    def __init__(self, id: int, passwd: str, timeout: int = 30) -> None:
         self._id = id
         self._passwd = passwd
         self._timeout = timeout
