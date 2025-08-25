@@ -588,6 +588,7 @@ class MFScraper:
                     for tr in table.select("tbody tr"):
                         if len(tr.attrs["class"]) == 0:
                             tds = tr.select("td")
+                            ac = title.text.replace("\n", "").strip()
                             subac = (
                                 tds[1].text.replace("\n", "") + " " + tds[2].text.replace("\n", "")
                             ).strip()
@@ -601,10 +602,10 @@ class MFScraper:
                             else:
                                 amount = None
                                 date = None
-                            if not ((title.text, subac) in ret and date is None):
+                            if not ((ac, subac) in ret and date is None):
                                 ret.update(
                                     {
-                                        (title.text, subac): {
+                                        (ac, subac): {
                                             "amount": amount,
                                             "date": date,
                                             "update_date": update_date,
